@@ -339,29 +339,38 @@ const Page = () => {
 
   const [padron, setPadron] = useState<Padron>(new Padron(materiasIniciales, creditosPlan, creditosGrupo));
 
-  function actualizarEstadosPorHabilitacion(padron: Padron, semestres: Materia[][]) {
+  function actualizarEstadosPorHabilitacion(padron: Padron, semestres: Materia[][]): Materia[][] {
     const todasLasMaterias = semestres.flat();
     const ordenadas = ordenarMateriasTopologicamente(todasLasMaterias);
 
-    // Primero, resetea todas a "no_aprobado"
-    for (const materia of ordenadas) {
-      materia.setEstado("no_aprobado");
-    }
+    const nuevaLista: Materia[] = ordenadas.map(materia => {
+      const nuevaMateria = Object.create(Object.getPrototypeOf(materia));
+      Object.assign(nuevaMateria, materia);
+      nuevaMateria.setEstado("no_aprobado");
+      return nuevaMateria;
+    });
 
-    // Luego, recorre en orden topológico y habilita solo las que correspondan
-    for (const materia of ordenadas) {
+    const materiasPorNombre = new Map(nuevaLista.map(m => [m.getNombre(), m]));
+
+    for (const materia of nuevaLista) {
       if (materia.isHabilitado(padron)) {
-        // Si la materia ya estaba aprobada/exonerada en el padron, mantenla así
         const estadoPadron = padron.materiasAprobadas.get(materia.getNombre());
         if (estadoPadron) {
           materia.setEstado(estadoPadron);
         }
       } else {
-        // Si no está habilitada, quítala del padrón
         padron.materiasAprobadas.delete(materia.getNombre());
       }
     }
+
+    // Reconstruir los semestres con nuevas referencias
+    const nuevoSemestres = semestres.map(semestre =>
+      semestre.map(m => materiasPorNombre.get(m.getNombre())!)
+    );
+
+    return nuevoSemestres;
   }
+
 
 const handleCursoClick = (curso: Materia) => {
   console.log("Click en materia:", curso.getNombre());
@@ -411,8 +420,8 @@ const handleCursoClick = (curso: Materia) => {
   );
 
   // ACTUALIZAR ESTADOS POR HABILITACIÓN
-  actualizarEstadosPorHabilitacion(nuevoPadron, nuevosSemestres);
-
+  const semestresActualizados = actualizarEstadosPorHabilitacion(nuevoPadron, nuevosSemestres);
+  
   setPadron(nuevoPadron);
   setSemestres(nuevosSemestres);
 };
@@ -434,8 +443,8 @@ const handleCursoClick = (curso: Materia) => {
   function calcularMateriasHabilitadas() {
     // Selecciona los semestres según el tipo
     const seleccion = tipoSemestre === 'par'
-      ? semPar
-      : semImpar;
+      ? [semestres[0], semestres[1],  semestres[3], semestres[5], semestres[7], [semestres[8][0], semestres[6][3]]]
+      : [semestres[0], semestres[1], semestres[2], semestres[4], semestres[6], [semestres[3][0]]];
 
     // Filtra materias habilitadas y no aprobadas
     const resultado = seleccion
